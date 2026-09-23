@@ -1,0 +1,37 @@
+# Qwen3.8-Flash-Next-NVFP4 + MTP (1Cat-vLLM, V100). Settings come from .env; override on
+# the command line, e.g.  GPUS=4,5 TP=2 PORT=8003 docker compose up -d
+name: flash-next
+
+services:
+  flash-next:
+    build:
+      context: .
+      additional_contexts:
+        wheels: ${WHEEL_DIR:-/data/wheels}
+    image: ${IMAGE:-llm/qwen3.8-flash-next-nvfp4:1cat-1.5.0}
+    container_name: flash-next
+    restart: unless-stopped
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      TP: ${TP:-}                          # empty = number of GPUs in GPUS (must be 1, 2 or 4)
+      MEM_UTIL: ${MEM_UTIL:-0.90}
+      MAX_MODEL_LEN: ${MAX_MODEL_LEN:-262144}
+      MAX_NUM_SEQS: ${MAX_NUM_SEQS:-4}
+      EXTRA_ARGS: ${EXTRA_ARGS:-}
+    volumes:
+      - /data/hf:/data/hf
+      - /data/vllm:/data/vllm
+      - /data/cache:/data/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPUS:-0,1,2,3}"]   # host GPU indices, as nvidia-smi shows them
+              capabilities: [gpu]

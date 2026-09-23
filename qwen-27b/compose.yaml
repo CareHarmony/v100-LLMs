@@ -1,0 +1,36 @@
+# Qwen3.8-27B + DFlash2 (1Cat-vLLM, V100). Settings come from .env; override on
+# the command line, e.g.  GPUS=4,5 TP=2 PORT=8002 docker compose up -d
+name: qwen-27b
+
+services:
+  qwen-27b:
+    build:
+      context: .
+      additional_contexts:
+        wheels: ${WHEEL_DIR:-/data/wheels}
+    image: ${IMAGE:-llm/qwen3.8-27b-dflash2:1cat-1.5.0}
+    container_name: qwen-27b
+    restart: unless-stopped
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    ports:
+      - "${PORT:-8001}:8000"
+    environment:
+      TP: ${TP:-}                          # empty = number of GPUs in GPUS
+      MEM_UTIL: ${MEM_UTIL:-0.90}
+      MAX_MODEL_LEN: ${MAX_MODEL_LEN:-262144}
+      EXTRA_ARGS: ${EXTRA_ARGS:-}
+    volumes:
+      - /data/hf:/data/hf
+      - /data/vllm:/data/vllm
+      - /data/cache:/data/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPUS:-4,5,6,7}"]   # host GPU indices, as nvidia-smi shows them
+              capabilities: [gpu]
