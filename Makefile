@@ -1,6 +1,6 @@
 # Run a target in every model directory, e.g. 'make build', 'make up', 'make status'.
 # Per-model: 'make -C qwen-27b up GPUS=4,5 TP=2' (see each directory's .env).
-MODELS  := qwen-27b flash-next
+MODELS  := qwen-27b flash-next jevk5
 TARGETS := build download up down restart status wait test config clean
 
 # 1Cat-vLLM (SM70 fork) release wheel, installed unmodified into both images.

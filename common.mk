@@ -5,20 +5,23 @@
 #   make up GPUS=4,5 TP=2 PORT=8002
 
 -include .env
-export GPUS TP PORT MEM_UTIL MAX_MODEL_LEN MAX_NUM_SEQS EXTRA_ARGS IMAGE WHEEL_DIR
+export GPUS TP PORT MEM_UTIL MAX_MODEL_LEN MAX_NUM_SEQS EXTRA_ARGS IMAGE WHEEL_DIR DTYPE REVISION
 export HOST_UID := $(shell id -u)
 export HOST_GID := $(shell id -g)
 
 COMPOSE := docker compose
+# A model directory can set these before including this file.
+READY_PATH ?= /v1/models
+SETTINGS   ?= GPUS=$(GPUS) TP=$(or $(TP),<number of GPUS>) PORT=$(PORT) MEM_UTIL=$(MEM_UTIL) MAX_MODEL_LEN=$(MAX_MODEL_LEN)
 
 .DEFAULT_GOAL := help
 .PHONY: help build download up down restart logs status wait test config shell clean
 
 help: ## Show targets and current settings
-	@grep -hE '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
-	@echo "  settings: GPUS=$(GPUS) TP=$(or $(TP),<number of GPUS>) PORT=$(PORT) MEM_UTIL=$(MEM_UTIL) MAX_MODEL_LEN=$(MAX_MODEL_LEN)"
+	@grep -hE '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '!seen[$$1]++ {printf "  %-8s %s\n", $$1, $$2}'
+	@echo "  settings: $(SETTINGS)"
 
-build: ## Build the image (fork wheel from WHEEL_DIR, checked against SHA256SUMS)
+build: ## Build the image
 	$(COMPOSE) build
 
 download: ## Download DOWNLOADS (repo[@revision] ...) to /data/hf; set HF_TOKEN to avoid rate limits
@@ -53,15 +56,17 @@ status: ## Show container state and API health
 
 wait: ## Block until the API answers (or the container dies)
 	@cid=$$($(COMPOSE) ps -aq); [ -n "$$cid" ] || { echo "not running; 'make up' first"; exit 1; }; \
-	until curl -sf -m5 -o /dev/null http://127.0.0.1:$(PORT)/v1/models; do \
+	until curl -sf -m5 -o /dev/null http://127.0.0.1:$(PORT)$(READY_PATH); do \
 		state=$$(docker inspect -f '{{.State.Status}}' $$cid); \
 		if [ "$$state" != running ]; then echo "container is '$$state'"; $(COMPOSE) logs --tail 30; exit 1; fi; \
 		sleep 10; done; echo "serving on port $(PORT)"
 
+ifndef CUSTOM_TEST
 test: ## Send one chat request
 	@curl -s http://127.0.0.1:$(PORT)/v1/chat/completions -H 'Content-Type: application/json' \
 		-d '{"model":"$(MODEL)","messages":[{"role":"user","content":"What is the capital of France?"}],"max_tokens":800}' \
 		| python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["choices"][0]["message"]["content"].strip() if "choices" in d else d)'
+endif
 
 config: ## Print the compose file with all variables resolved
 	$(COMPOSE) config

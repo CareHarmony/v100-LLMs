@@ -1,0 +1,28 @@
+# JevK5 typed-decision model (/v1/systemone, V100). Settings come from .env; override on
+# the command line, e.g.  GPUS=3 PORT=8091 docker compose up -d
+name: jevk5
+
+services:
+  jevk5:
+    build:
+      context: .
+    image: ${IMAGE:-llm/jevk5:0.2.2}
+    container_name: jevk5
+    restart: unless-stopped
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    ports:
+      - "${PORT:-8090}:8000"
+    environment:
+      MODEL: alibiserikbay/JevK5
+      REVISION: ${REVISION:-27d2d6b8d4714807f6293b0623bd7370b27e42f8}
+      DTYPE: ${DTYPE:-float16}
+    volumes:
+      - /data/hf:/data/hf
+      - /data/cache:/data/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPUS:-2}"]   # host GPU index, as nvidia-smi shows it
+              capabilities: [gpu]
